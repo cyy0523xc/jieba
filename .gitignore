@@ -170,3 +170,6 @@ test/tmp/*
 *.class
 
 MANIFEST
+
+# vim
+.ropeproject
