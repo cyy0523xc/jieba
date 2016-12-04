@@ -1,7 +1,4 @@
 from __future__ import absolute_import, unicode_literals
-__version__ = '0.38'
-__license__ = 'MIT'
-
 import re
 import os
 import sys
@@ -15,12 +12,17 @@ from hashlib import md5
 from ._compat import *
 from . import finalseg
 
+__version__ = '0.38'
+__license__ = 'MIT'
+
 if os.name == 'nt':
     from shutil import move as _replace_file
 else:
     _replace_file = os.rename
 
-_get_abs_path = lambda path: os.path.normpath(os.path.join(os.getcwd(), path))
+
+def _get_abs_path(path):
+    return os.path.normpath(os.path.join(os.getcwd(), path))
 
 DEFAULT_DICT = None
 DEFAULT_DICT_NAME = "dict.txt"
@@ -34,7 +36,12 @@ DICT_WRITING = {}
 
 pool = None
 
+# 对于只有一个关键词的时候，例如：Hong Kong，识别会有问题
+# 如果有关键词类似“公交线路 381”这样的，也识别不了
 re_userdict = re.compile('^(.+?)( [0-9]+)?( [a-z]+)?$', re.U)
+
+# 使用分号进行分隔
+re_userdict_semicolon = re.compile('^([^;]+?)(?:;)?([0-9]+)?(?:;)?([a-z]+)?$', re.U)
 
 re_eng = re.compile('[a-zA-Z0-9]', re.U)
 
@@ -45,9 +52,11 @@ re_skip_default = re.compile("(\r\n|\s)", re.U)
 re_han_cut_all = re.compile("([\u4E00-\u9FD5]+)", re.U)
 re_skip_cut_all = re.compile("[^a-zA-Z0-9+#\n]", re.U)
 
+
 def setLogLevel(log_level):
     global logger
     default_logger.setLevel(log_level)
+
 
 class Tokenizer(object):
 
@@ -84,7 +93,8 @@ class Tokenizer(object):
                         lfreq[wfrag] = 0
             except ValueError:
                 raise ValueError(
-                    'invalid dictionary entry in %s at Line %s: %s' % (f_name, lineno, line))
+                    'invalid dictionary entry in %s at Line %s: %s' %
+                    (f_name, lineno, line))
         f.close()
         return lfreq, ltotal
 
@@ -108,7 +118,9 @@ class Tokenizer(object):
             if self.initialized:
                 return
 
-            default_logger.debug("Building prefix dict from %s ..." % (abs_path or 'the default dictionary'))
+            default_logger.debug(
+                "Building prefix dict from %s ..." %
+                (abs_path or 'the default dictionary'))
             t1 = time.time()
             if self.cache_file:
                 cache_file = self.cache_file
@@ -125,8 +137,8 @@ class Tokenizer(object):
             tmpdir = os.path.dirname(cache_file)
 
             load_from_cache_fail = True
-            if os.path.isfile(cache_file) and (abs_path == DEFAULT_DICT or
-                os.path.getmtime(cache_file) > os.path.getmtime(abs_path)):
+            if os.path.isfile(cache_file) and (abs_path == DEFAULT_DICT or os.path.getmtime(
+                    cache_file) > os.path.getmtime(abs_path)):
                 default_logger.debug(
                     "Loading model from cache %s" % cache_file)
                 try:
@@ -140,7 +152,8 @@ class Tokenizer(object):
                 wlock = DICT_WRITING.get(abs_path, threading.RLock())
                 DICT_WRITING[abs_path] = wlock
                 with wlock:
-                    self.FREQ, self.total = self.gen_pfdict(self.get_dict_file())
+                    self.FREQ, self.total = self.gen_pfdict(
+                        self.get_dict_file())
                     default_logger.debug(
                         "Dumping model to file cache %s" % cache_file)
                     try:
@@ -353,6 +366,24 @@ class Tokenizer(object):
         else:
             return open(self.dictionary, 'rb')
 
+    # 用户自定义字典正则表达式
+    userdict_pattern = re_userdict
+
+    def set_userdict_semicolon(self):
+        '''
+        设置使用分号进行分隔，替换原来按空格的正则表达式
+        '''
+        self.userdict_pattern = re_userdict_semicolon
+
+    def set_userdict_pattern(self, pattern):
+        '''
+        pattern: string 字典每行的正则表达式
+        '''
+        self.userdict_pattern = re.compile(pattern, re.U)
+
+    def parse_one_line(self, line):
+        return self.userdict_pattern.match(line).groups()
+
     def load_userdict(self, f):
         '''
         Load personalized dict to improve detect rate.
@@ -380,11 +411,14 @@ class Tokenizer(object):
                 try:
                     line = line.decode('utf-8').lstrip('\ufeff')
                 except UnicodeDecodeError:
-                    raise ValueError('dictionary file %s must be utf-8' % f_name)
+                    raise ValueError(
+                        'dictionary file %s must be utf-8' %
+                        f_name)
             if not line:
                 continue
             # match won't be None because there's at least one character
-            word, freq, tag = re_userdict.match(line).groups()
+            # word, freq, tag = re_userdict.match(line).groups()
+            word, freq, tag = self.parse_one_line(line)
             if freq is not None:
                 freq = freq.strip()
             if tag is not None:
@@ -512,6 +546,10 @@ suggest_freq = dt.suggest_freq
 tokenize = dt.tokenize
 user_word_tag_tab = dt.user_word_tag_tab
 
+# 自定义字典的正则设置接口
+set_userdict_semicolon = dt.set_userdict_semicolon
+set_userdict_pattern = dt.set_userdict_pattern
+
 
 def _lcut_all(s):
     return dt._lcut_all(s)
@@ -525,8 +563,11 @@ def _lcut_no_hmm(s):
     return dt._lcut_no_hmm(s)
 
 
+"""
+# 重复定义
 def _lcut_all(s):
     return dt._lcut_all(s)
+"""
 
 
 def _lcut_for_search(s):

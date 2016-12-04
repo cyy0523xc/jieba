@@ -5,8 +5,8 @@ import jieba
 import jieba.posseg
 from operator import itemgetter
 
-_get_module_path = lambda path: os.path.normpath(os.path.join(os.getcwd(),
-                                                 os.path.dirname(__file__), path))
+_get_module_path = lambda path: os.path.normpath(
+    os.path.join(os.getcwd(), os.path.dirname(__file__), path))
 _get_abs_path = jieba._get_abs_path
 
 DEFAULT_IDF = _get_module_path("idf.txt")
@@ -14,11 +14,39 @@ DEFAULT_IDF = _get_module_path("idf.txt")
 
 class KeywordExtractor(object):
 
-    STOP_WORDS = set((
-        "the", "of", "is", "and", "to", "in", "that", "we", "for", "an", "are",
-        "by", "be", "as", "on", "with", "can", "if", "from", "which", "you", "it",
-        "this", "then", "at", "have", "all", "not", "one", "has", "or", "that"
-    ))
+    STOP_WORDS = set(
+        ("the",
+         "of",
+         "is",
+         "and",
+         "to",
+         "in",
+         "that",
+         "we",
+         "for",
+         "an",
+         "are",
+         "by",
+         "be",
+         "as",
+         "on",
+         "with",
+         "can",
+         "if",
+         "from",
+         "which",
+         "you",
+         "it",
+         "this",
+         "then",
+         "at",
+         "have",
+         "all",
+         "not",
+         "one",
+         "has",
+         "or",
+         "that"))
 
     def set_stop_words(self, stop_words_path):
         abs_path = _get_abs_path(stop_words_path)
@@ -41,13 +69,21 @@ class IDFLoader(object):
         if idf_path:
             self.set_new_path(idf_path)
 
+    # 分隔符
+    seperator = ' '
+
+    def set_new_seperator(self, seperator):
+        '''设置新的分隔符'''
+        self.seperator = seperator
+
     def set_new_path(self, new_idf_path):
         if self.path != new_idf_path:
             self.path = new_idf_path
             content = open(new_idf_path, 'rb').read().decode('utf-8')
             self.idf_freq = {}
+            seperator = self.seperator
             for line in content.splitlines():
-                word, freq = line.strip().split(' ')
+                word, freq = line.strip().split(seperator)
                 self.idf_freq[word] = float(freq)
             self.median_idf = sorted(
                 self.idf_freq.values())[len(self.idf_freq) // 2]
@@ -72,7 +108,17 @@ class TFIDF(KeywordExtractor):
         self.idf_loader.set_new_path(new_abs_path)
         self.idf_freq, self.median_idf = self.idf_loader.get_idf()
 
-    def extract_tags(self, sentence, topK=20, withWeight=False, allowPOS=(), withFlag=False):
+    def set_idf_seperator(self, seperator):
+        self.idf_loader.set_new_seperator(seperator)
+
+    def extract_tags(
+        self,
+        sentence,
+        topK=20,
+        withWeight=False,
+        allowPOS=(),
+        withFlag=False
+    ):
         """
         Extract keywords from sentence using TF-IDF algorithm.
         Parameter:
